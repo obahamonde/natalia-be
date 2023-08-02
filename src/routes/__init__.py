@@ -1,4 +1,2 @@
-from .middleware import *
-from .resources import *
-from .streaming import *
-from .websockets import *
+from .auto import use_auto
+from .chat import use_chat

@@ -42,8 +42,8 @@ class CodeServer(FaunaModel):
         - payload(token:str, volume:str) -> Dict[str, Any]
     """
 
-    login: str = Field(..., index=True, description="User reference")
-    repo: str = Field(..., description="User reference", unique=True)
+    user: str = Field(..., index=True, description="User reference")
+    namespace: str = Field(..., description="User reference", unique=True)
     container_id: Optional[str] = Field(default=None)
     image: str = Field(default="codeserver", description="Image to use")
     host_port: int = Field(default_factory=gen_port, description="Port to expose")
@@ -66,10 +66,10 @@ class CodeServer(FaunaModel):
         assert isinstance(self.env_vars, list)
         self.env_vars.append(f"FAUNA_SECRET={token}")
         self.env_vars.append(f"EMAIL={self.email}")
-        self.env_vars.append(f"PASSWORD={self.login}")
+        self.env_vars.append(f"PASSWORD={self.user}")
         self.env_vars.append("TZ=America/New_York")
-        self.env_vars.append(f"USER={self.login}")
-        self.env_vars.append(f"SUDO_PASSWORD={self.login}")
+        self.env_vars.append(f"USER={self.user}")
+        self.env_vars.append(f"SUDO_PASSWORD={self.user}")
         self.env_vars.append(f"EXTENSIONS={','.join(extensions)}")
         git_startup_script = f"""
         set -e\n
@@ -108,8 +108,8 @@ class Runner(FaunaModel):
         - payload(token:str, volume:str) -> Json
     """
 
-    login: Optional[str] = Field(default=None, index=True)
-    repo: str = Field(..., description="Github Repo", unique=True)
+    user: Optional[str] = Field(default=None, index=True)
+    namespace: str = Field(..., description="Github Repo", unique=True)
     image: str = Field(..., description="Image to use")
     host_port: int = Field(default_factory=gen_port, description="Port to expose")
     container_port: int = Field(default=8080, description="Port to expose")
@@ -126,7 +126,7 @@ class Runner(FaunaModel):
             dir_ = "/app"
         return {
             "Image": self.image,
-            "Env": self.env_vars + [f"FAUNA_SECRET={token}","OPENAI_API_KEY=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","OPENAI_BASE_URL=https://api.openai.com"],
+            "Env": self.env_vars + [f"FAUNA_SECRET={token}"],
             "ExposedPorts": {
                 f"{self.container_port}/tcp": {"HostPort": str(self.host_port)}
             },

@@ -11,7 +11,6 @@ from langchain.embeddings import OpenAIEmbeddings
 from pydantic import Field, HttpUrl
 
 from ..config import env
-from ..routes.middleware import backgroundtask
 
 openai_embeddings = OpenAIEmbeddings()  # type: ignore
 
@@ -79,7 +78,7 @@ async def upsert_embeddings(texts: List[str], namespace: str, session: ClientSes
             for text, vector in zip(texts, embeddings)
         ],
     )
-    async with session.post("/vectors/upsert", json=vectors.dict()) as response:
+    async with session.post("/vectors/upsert", json=vectors._asdict()) as response:
         if response.status != 200:
             raise RuntimeError(await response.text())
 
@@ -133,7 +132,7 @@ class IngestSiteMap(FunctionType):
     
     url:HttpUrl = Field(..., description="The base url of the website to be ingested")
     namespace:str = Field(..., description="The name of the pinecone vector store where the embeddings will be stored")
-    @backgroundtask
+
     @handle_errors
     async def run(self):
         async with ClientSession(headers=HEADERS) as session:
@@ -148,3 +147,5 @@ class IngestSiteMap(FunctionType):
                     if data == "100":
                         break
                     
+                    
+    

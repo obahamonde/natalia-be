@@ -15,6 +15,7 @@ from requests import post
 from src import create_app
 from src.utils import gen_port, nginx_cleanup
 
+app = create_app()
 
 @click.group()
 def cli():
@@ -30,7 +31,7 @@ def run(port, host, prod):
         subprocess.run(["gunicorn", "main:app", "-k", "aiohttp.worker.GunicornWebWorker","--reload","--bind", f"{host}:{port}"])
     else:
         subprocess.run(["gunicorn", "main:app", "-k", "aiohttp.worker.GunicornWebWorker","--bind", f"{host}:{port}", "--workers", "4", "--threads", "4"])
-    
+ 
 @cli.command()
 def build():
     """Build all containers"""
@@ -45,7 +46,7 @@ def prune():
     nginx_cleanup()
 
 
-app = create_app()
+
 
 app.static()
 

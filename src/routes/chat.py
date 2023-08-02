@@ -1,14 +1,11 @@
 from aiofauna import APIServer
-from aiofauna.json import to_json
-from aiohttp.web_response import StreamResponse
 
-from .helpers import *
-from .helpers.formaters import MarkdownRenderer
-from .routes import *
-from .schemas import *
-from .services import *
-from .templates import *
-from .tools import *
+from ..helpers import *
+from ..helpers.formaters import MarkdownRenderer
+from ..routes import *
+from ..schemas import *
+from ..services import *
+from ..tools import *
 
 previous = Template("""
 Conversation:
@@ -25,11 +22,11 @@ Previous messages exchanged with user:
 {% endfor %}
 """)
 
-def create_app():
-    app = APIServer()
+def use_chat(app:APIServer):   
     
     @app.post("/api/auth")
     async def auth_endpoint(request:Request):
+        """Authenticates a user using Auth0 and saves it to the database"""
         token = request.headers.get("Authorization", "").split("Bearer ")[-1]
         user_dict = await auth.update_headers({"Authorization": f"Bearer {token}"}).get("/userinfo") 
         user = User(**user_dict)
@@ -39,6 +36,7 @@ def create_app():
     
     @app.get("/api/conversation/new")
     async def conversation_create(user:str):
+        """Creates a new conversation for a user"""
         return await Namespace(user=user).save() # type:ignore
     @app.get("/api/conversation/get")
     async def conversation_get(id:str):
@@ -50,25 +48,32 @@ def create_app():
     
     @app.get("/api/conversation/list")
     async def conversation_list(user:str):
+        """Lists all conversations for a user"""
         return await Namespace.find_many(user=user) 
 
     
     @app.delete("/api/conversation")
     async def conversation_delete(id:str):
+        """Deletes a conversation"""
         return await Namespace.delete(id)
 
     async def conversation_title(text:str,id:str):
+        """Sets the title of a conversation"""
         conversation_obj = await Namespace.get(id)
         return await conversation_obj.set_title(text)
     
     @app.post("/api/audio")
-    async def audio_response(text:str):
-        response = await llm.chat(text,"You are a helpful assistant")
-        polly = Polly.from_text(response)
-        return Response(body=await polly.get_audio(),content_type="application/octet-stream")
+    async def audio_response(text:str,mode:str):
+        """Returns an audio response from a text""" 
+        if mode == "llm":
+            response = await llm.chat(text,"You are a helpful assistant")
+            polly = Polly.from_text(response)
+            return Response(body=await polly.get_audio(),content_type="application/octet-stream")
+        return Response(body=await Polly.from_text(text).get_audio(),content_type="application/octet-stream")
     
     @app.post("/api/messages/list")
     async def post_chat(text:str,namespace:str):
+        """Returns a list of messages from a conversation"""
         conversation = await Namespace.get(namespace)
         if conversation.title == "[New Conversation]":
             return await conversation.set_title(text)
@@ -76,6 +81,7 @@ def create_app():
     
     @app.get("/api/messages/get")
     async def get_messages(id:str):
+        """Returns a list of messages from a conversation"""
         response = await ChatMessage.find_many(conversation=id)
         messages = []
         for message in response:
@@ -86,17 +92,10 @@ def create_app():
                 "ref":message.ref
             })
         return messages
-    
-    @app.post("/api/functions")
-    async def functions_endpoint(text:str):
-        return to_json(await function_call(text))
         
-    @app.post("/api/upload")
-    async def upload_endpoint(request:Request):
-        return await upload_asset(request)
-    
     @app.websocket("/api/ws")
     async def ws_endpoint(ws:WebSocketResponse,namespace:str):
+        """Websocket endpoint for chat"""
         conversation = await Namespace.get(namespace)
         while True:
             text = await ws.receive_str()

@@ -10,7 +10,6 @@ from ..helpers.utils import nginx_render
 
 
 @dataclass
-
 class CloudFlare(APIClient):
     """Domain provisioning service"""
 

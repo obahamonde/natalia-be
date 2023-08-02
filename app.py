@@ -37,7 +37,7 @@ class SeoTags(FunctionType):
     """
     query:str = Field(...)
     lang:str = Field(default="en")
-    limit:int = Field(...)
+    limit:int = Field(default=10)
     results:Optional[List[SearchResult]] = Field(default=None)
     
     async def run(self):
@@ -50,23 +50,14 @@ class SeoTags(FunctionType):
                     return [ meta.get("content") for meta in response if meta.get("name") in ["description","keywords"] ]
             tasks = [fetch_meta_seo_content(result.url, session) for result in self.results]
             self.results = await asyncio.gather(*tasks)
-            response = []
-            for i, result in enumerate(self.results):
-                response.extend(result)
-            return response
-        
-        
-class GoogleSearch(FunctionType):
-    """
-    Search for anything on Google.
-    """
-    query:str = Field(...)
-    lang:str = Field(default="en")
-    limit:int = Field(...)
-    results:Optional[List[SearchResult]] = Field(default=None)
-    
-    async def run(self):
-        self.results = await search_google(self.query,self.lang,self.limit)
         return self.results
     
     
+    
+from aiofauna import APIServer
+
+app = APIServer()
+
+@app.get("/seo") 
+async def seo_tags(query:str, limit:int=10, lang:str="en"):
+    return await SeoTags(query=query, limit=limit, lang=lang).run()

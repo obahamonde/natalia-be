@@ -38,7 +38,7 @@ def nginx_render(name: str, port: int):
         with open(f"{path}/{name}.conf", "w", encoding="utf-8") as f:
             f.write(
                 Template(
-                    open("src/templates/t_nginx.conf.jinja2", "r").read()
+                    open("templates/nginx.conf", "r").read()
                 ).render(name=name, port=port)
             )
 

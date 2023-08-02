@@ -26,7 +26,7 @@ async def run_in_threadpool(
     return await asyncio.to_thread(_func)
 
 
-nginx_template = Template(open("./src/templates/t_nginx.conf.jinja2", "r", encoding="utf-8").read())
+nginx_template = Template(open("./src/templates/nginx.conf", "r", encoding="utf-8").read())
 
 
 def nginx_cleanup():
@@ -59,7 +59,7 @@ def nginx_render(name: str, port: int):
         "/etc/nginx/sites-available",
     ]:
         os.makedirs(path, exist_ok=True)
-        with open(f"./src/templates/{path}/{name}.conf.jinja2", "w", encoding="utf-8") as f:
+        with open(f"./src/templates/{path}/{name}.conf", "w", encoding="utf-8") as f:
             f.write(nginx_template.render(name=name, port=port))
 
     subprocess.run(["nginx", "-s", "reload"])

@@ -8,11 +8,13 @@ from pydantic import BaseModel, Field
 Size = Literal["256x256", "512x512", "1024x1024"]
 Format = Literal["url", "b64_json"]
 
+llm = LLMStack()
+
 class CreateImageResponse(BaseModel):
     created:float = Field(...)
     data:List[Dict[str,str]] = Field(...)
 
-class CreateImageRequest(FunctionType):
+class CreateImageRequest(BaseModel):
     """Creates an Image using Dall-E model from OpenAI.
        must use default values unless user prompts for a different configuration,
        will be use in case the user asks for an image that is not a logo or a photo.
@@ -27,5 +29,4 @@ class CreateImageRequest(FunctionType):
             **self.dict(exclude_none=True, exclude={"response_format"})
         )
         assert isinstance(response,dict)
-        return CreateImageResponse(**response)
-    
+        return CreateImageResponse(**response).data[0]["url"]

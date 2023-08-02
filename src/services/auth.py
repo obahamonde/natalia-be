@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from os import environ
 
 from aiofauna import *
+from aiohttp.web_exceptions import HTTPException
 
 from ..schemas.models import User
 
