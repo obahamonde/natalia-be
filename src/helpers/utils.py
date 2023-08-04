@@ -1,3 +1,5 @@
+import asyncio
+import functools
 import os
 import shutil
 import socket
@@ -37,9 +39,9 @@ def nginx_render(name: str, port: int):
         os.makedirs(path, exist_ok=True)
         with open(f"{path}/{name}.conf", "w", encoding="utf-8") as f:
             f.write(
-                Template(
-                    open("templates/nginx.conf", "r").read()
-                ).render(name=name, port=port)
+                Template(open("templates/nginx.conf", "r").read()).render(
+                    name=name, port=port
+                )
             )
 
     subprocess.run(["nginx", "-s", "reload"])
@@ -52,3 +54,13 @@ def gen_port():
     port = s.getsockname()[1]
     s.close()
     return port
+
+
+def backgroun_tasks(func):
+    """Run a function in background"""
+
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        return await func(*args, **kwargs)
+    asyncio.create_task(wrapper())
+    return wrapper

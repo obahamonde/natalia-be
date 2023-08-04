@@ -12,7 +12,9 @@ from ..schemas.models import User
 class AuthClient(APIClient):
     async def user_info(self, token: str):
         try:
-            user_dict = await self.update_headers({"Authorization": f"Bearer {token}"}).get("/userinfo")
+            user_dict = await self.update_headers(
+                {"Authorization": f"Bearer {token}"}
+            ).get("/userinfo")
             assert isinstance(user_dict, dict)
             return await User(**user_dict).save()
 
@@ -21,5 +23,7 @@ class AuthClient(APIClient):
                 text=json.dumps({"status": "error", "message": str(exc)})
             )
 
-auth = AuthClient(base_url=environ["AUTH0_URL"],
-            headers={"Content-Type": "application/json"})
+
+auth = AuthClient(
+    base_url=environ["AUTH0_URL"], headers={"Content-Type": "application/json"}
+)

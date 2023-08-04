@@ -26,8 +26,6 @@ class ContainerCreate(BaseModel):
     email: str = Field(..., description="Email of the user")
     image: TemplatesAvailable = Field(..., description="Image to use")
 
-    
-
 
 class CodeServer(FaunaModel):
     """
@@ -138,6 +136,7 @@ class Runner(FaunaModel):
             },
         }
 
+
 @dataclass
 class DockerService(APIClient):
     """
@@ -145,7 +144,8 @@ class DockerService(APIClient):
         - start_container(container_id:str) -> None
         - create_volume(tag:str) -> str
         - create_container(body:ContainerCreate, volume:str) -> Container
-    """    
+    """
+
     async def start_container(self, container_id: str):
         """
         Starts a container
@@ -165,7 +165,7 @@ class DockerService(APIClient):
         )
         return tag
 
-    async def create_container(self, body: ContainerCreate, volume: str,token:str):
+    async def create_container(self, body: ContainerCreate, volume: str, token: str):
         """Create a python container
         - (body:ContainerCreate) -> Container
         """
@@ -207,4 +207,7 @@ class DockerService(APIClient):
         await self.start_container(instance.container_id)
         return instance
 
-docker = DockerService(base_url="http://localhost:9898",headers={"Content-Type": "application/json"})
+
+docker = DockerService(
+    base_url="http://localhost:9898", headers={"Content-Type": "application/json"}
+)

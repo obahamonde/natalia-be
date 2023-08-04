@@ -9,9 +9,6 @@ from aiofauna.utils import chunker, setup_logging
 from aiohttp.web import FileField, Request
 from pypdf import PdfReader
 
-from ..schemas import Namespace, Upload
-from ..services import Bucket
-
 
 async def pdf_reader(request: Request) -> AsyncGenerator[str, None]:
     """Reads a PDF file from the request and returns a list of strings"""
@@ -22,4 +19,3 @@ async def pdf_reader(request: Request) -> AsyncGenerator[str, None]:
         reader = PdfReader(f)
     for page in reader.pages:
         yield page.extract_text()
-        

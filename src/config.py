@@ -1,5 +1,3 @@
-
-
 import base64
 import json
 
@@ -8,6 +6,7 @@ from dotenv import load_dotenv
 from pydantic import BaseConfig, BaseSettings
 
 load_dotenv()
+
 
 class AWSCredentials(BaseSettings):
     """AWS credentials for boto3"""

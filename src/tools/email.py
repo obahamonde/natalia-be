@@ -15,16 +15,18 @@ aws = Session(**credentials)
 
 ses = aws.client("ses")
 
-class ContactForm(FunctionType,FaunaModel):
+
+class ContactForm(FunctionType, FaunaModel):
     """Fills a contact form for a user in order to suscribe to a newsletter,
-       offers, premium content or custommer support. Must validate the email
-       characters, verifies the email on SES and if it's not verified it will
-       send a verification email"""
+    offers, premium content or custommer support. Must validate the email
+    characters, verifies the email on SES and if it's not verified it will
+    send a verification email"""
+
     name: str = Field(..., max_length=64)
     email: EmailStr = Field(...)
     message: Optional[str] = Field(default=None, max_length=512)
     verified: bool = Field(default=False)
-    
+
     def send_email_ses(self):
         response = ses.send_email(
             Source="oscar.bahamonde.dev@gmail.com",

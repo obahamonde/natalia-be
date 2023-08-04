@@ -51,6 +51,7 @@ connector = TCPConnector(limit=500)
 
 logger = setup_logging(__name__)
 
+
 @handle_errors
 async def sitemap(url: str, session: ClientSession) -> List[str]:
     urls = []
@@ -68,6 +69,7 @@ async def sitemap(url: str, session: ClientSession) -> List[str]:
             urls.extend(await sitemap(nested_sitemap.loc.text, session))
     return urls
 
+
 @handle_errors
 async def upsert_embeddings(texts: List[str], namespace: str, session: ClientSession):
     embeddings = await openai_embeddings.aembed_documents(texts)
@@ -81,6 +83,7 @@ async def upsert_embeddings(texts: List[str], namespace: str, session: ClientSes
     async with session.post("/vectors/upsert", json=vectors._asdict()) as response:
         if response.status != 200:
             raise RuntimeError(await response.text())
+
 
 @handle_errors
 async def fetch_website(url: str, session: ClientSession, max_size: int = 40960) -> str:
@@ -121,17 +124,22 @@ async def sitemap_pipeline(
             logger.error(e)
             continue
 
-llm = LLMStack(base_url=PINECONE_URL, headers={"api-key": PINECONE_API_KEY}) 
-        
+
+llm = LLMStack(base_url=PINECONE_URL, headers={"api-key": PINECONE_API_KEY})
+
+
 class IngestSiteMap(FunctionType):
     """Iterates over all the nested sitemap.xml related files, finds the loc of the content urls,
     scraps those urls and upserts the embeddings of the page content into the pinecone vector store.
     for further similarity search in order to feed a Large Language Model (LLM) with the content as a
     knowledge base.
     """
-    
-    url:HttpUrl = Field(..., description="The base url of the website to be ingested")
-    namespace:str = Field(..., description="The name of the pinecone vector store where the embeddings will be stored")
+
+    url: HttpUrl = Field(..., description="The base url of the website to be ingested")
+    namespace: str = Field(
+        ...,
+        description="The name of the pinecone vector store where the embeddings will be stored",
+    )
 
     @handle_errors
     async def run(self):
@@ -141,11 +149,11 @@ class IngestSiteMap(FunctionType):
                 base_url=env.PINECONE_API_URL, headers={"api-key": env.PINECONE_API_KEY}
             ) as pinecone:
                 async for data in sitemap_pipeline(
-                    url=self.url, namespace=self.namespace, session=session, pinecone_session=pinecone
+                    url=self.url,
+                    namespace=self.namespace,
+                    session=session,
+                    pinecone_session=pinecone,
                 ):
                     progress.append(data)
                     if data == "100":
                         break
-                    
-                    
-    

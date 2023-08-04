@@ -16,7 +16,10 @@ BROWSER_HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/90.0.4430.212 Chrome/90.0.4430.212 Safari/537.36"
 }
 
-async def search_google(text: str,lang:str="en",limit:int=10) -> List[SearchResult]:
+
+async def search_google(
+    text: str, lang: str = "en", limit: int = 10
+) -> List[SearchResult]:
     async with ClientSession(headers=BROWSER_HEADERS) as session:
         async with session.get(
             f"https://www.google.com/search?q={text}&hl={lang}&num={limit}"
@@ -35,38 +38,46 @@ class SeoTags(FunctionType):
     """
     Search for a SEO Tags from results of a Google Search.
     """
-    query:str = Field(...)
-    lang:str = Field(default="en")
-    limit:int = Field(...)
-    results:Optional[List[SearchResult]] = Field(default=None)
-    
+
+    query: str = Field(...)
+    lang: str = Field(default="en")
+    limit: int = Field(...)
+    results: Optional[List[SearchResult]] = Field(default=None)
+
     async def run(self):
-        self.results = await search_google(self.query,self.lang,self.limit)
+        self.results = await search_google(self.query, self.lang, self.limit)
         async with aiohttp.ClientSession(headers=BROWSER_HEADERS) as session:
-            async def fetch_meta_seo_content(url:str, session:ClientSession):
+
+            async def fetch_meta_seo_content(url: str, session: ClientSession):
                 async with session.get(url) as response:
                     soup = BeautifulSoup(await response.text(), "html.parser")
                     response = soup.find_all("meta")
-                    return [ meta.get("content") for meta in response if meta.get("name") in ["description","keywords"] ]
-            tasks = [fetch_meta_seo_content(result.url, session) for result in self.results]
+                    return [
+                        meta.get("content")
+                        for meta in response
+                        if meta.get("name") in ["description", "keywords"]
+                    ]
+
+            tasks = [
+                fetch_meta_seo_content(result.url, session) for result in self.results
+            ]
             self.results = await asyncio.gather(*tasks)
             response = []
             for i, result in enumerate(self.results):
                 response.extend(result)
             return response
-        
-        
+
+
 class GoogleSearch(FunctionType):
     """
     Search for anything on Google.
     """
-    query:str = Field(...)
-    lang:str = Field(default="en")
-    limit:int = Field(...)
-    results:Optional[List[SearchResult]] = Field(default=None)
-    
+
+    query: str = Field(...)
+    lang: str = Field(default="en")
+    limit: int = Field(...)
+    results: Optional[List[SearchResult]] = Field(default=None)
+
     async def run(self):
-        self.results = await search_google(self.query,self.lang,self.limit)
+        self.results = await search_google(self.query, self.lang, self.limit)
         return self.results
-    
-    

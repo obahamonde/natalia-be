@@ -1,4 +1,3 @@
-
 import asyncio
 from dataclasses import dataclass, field
 
@@ -14,11 +13,14 @@ class CloudFlare(APIClient):
     """Domain provisioning service"""
 
     config: APIConfig = field(
-        default_factory=lambda: APIConfig(base_url="https://api.cloudflare.com", headers={
-            "X-Auth-Email": env.CF_EMAIL,
-            "X-Auth-Key": env.CF_API_KEY,
-            "Content-Type": "application/json",
-        })
+        default_factory=lambda: APIConfig(
+            base_url="https://api.cloudflare.com",
+            headers={
+                "X-Auth-Email": env.CF_EMAIL,
+                "X-Auth-Key": env.CF_API_KEY,
+                "Content-Type": "application/json",
+            },
+        )
     )
 
     async def provision(self, name: str, port: int):
@@ -27,7 +29,8 @@ class CloudFlare(APIClient):
         """
         try:
             response = await self.fetch(
-                f"/client/v4/zones/{env.CF_ZONE_ID}/dns_records", "POST",
+                f"/client/v4/zones/{env.CF_ZONE_ID}/dns_records",
+                "POST",
                 json={
                     "type": "A",
                     "name": name,
@@ -56,15 +59,21 @@ class CloudFlare(APIClient):
         results = records["result"]
 
         async def delete_record(record):
-            await self.delete(
-                f"/zones/{env.CF_ZONE_ID}/dns_records/{record['id']}"
-            )
+            await self.delete(f"/zones/{env.CF_ZONE_ID}/dns_records/{record['id']}")
 
         await asyncio.gather(*[delete_record(record) for record in results])
 
         return results
 
-cf = CloudFlare(base_url="https://api.cloudflare.com", headers={"X-Auth-Email": env.CF_EMAIL, "X-Auth-Key": env.CF_API_KEY, "Content-Type": "application/json"})
+
+cf = CloudFlare(
+    base_url="https://api.cloudflare.com",
+    headers={
+        "X-Auth-Email": env.CF_EMAIL,
+        "X-Auth-Key": env.CF_API_KEY,
+        "Content-Type": "application/json",
+    },
+)
 
 
 class DnsRecord(FunctionType):
@@ -72,8 +81,9 @@ class DnsRecord(FunctionType):
     Provisions an A record for a docker container
     on Cloudflare CDN with an ssl certificate
     """
-    host:str
-    port:int
-    
+
+    host: str
+    port: int
+
     async def run(self):
         return await cf.provision(self.host, self.port)

@@ -8,4 +8,4 @@ from .cloudflare import *
 from .docker import *
 from .speech import *
 
-llm = LLMStack(base_url=os.environ.get("PINECONE_URL"),headers={"api-key": os.environ.get("PINECONE_KEY")}) # type: ignore
+llm = LLMStack(base_url=os.environ.get("PINECONE_URL"), headers={"api-key": os.environ.get("PINECONE_KEY")})  # type: ignore

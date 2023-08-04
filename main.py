@@ -17,6 +17,7 @@ from src.utils import gen_port, nginx_cleanup
 
 app = create_app()
 
+
 @click.group()
 def cli():
     pass
@@ -28,10 +29,34 @@ def cli():
 @click.option("--prod", default=False)
 def run(port, host, prod):
     if not prod:
-        subprocess.run(["gunicorn", "main:app", "-k", "aiohttp.worker.GunicornWebWorker","--reload","--bind", f"{host}:{port}"])
+        subprocess.run(
+            [
+                "gunicorn",
+                "main:app",
+                "-k",
+                "aiohttp.worker.GunicornWebWorker",
+                "--reload",
+                "--bind",
+                f"{host}:{port}",
+            ]
+        )
     else:
-        subprocess.run(["gunicorn", "main:app", "-k", "aiohttp.worker.GunicornWebWorker","--bind", f"{host}:{port}", "--workers", "4", "--threads", "4"])
- 
+        subprocess.run(
+            [
+                "gunicorn",
+                "main:app",
+                "-k",
+                "aiohttp.worker.GunicornWebWorker",
+                "--bind",
+                f"{host}:{port}",
+                "--workers",
+                "4",
+                "--threads",
+                "4",
+            ]
+        )
+
+
 @cli.command()
 def build():
     """Build all containers"""
@@ -46,13 +71,8 @@ def prune():
     nginx_cleanup()
 
 
-
-
 app.static()
 
 
 if __name__ == "__main__":
     cli()
-    
-    
-    

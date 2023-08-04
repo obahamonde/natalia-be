@@ -26,11 +26,12 @@ async def run_in_threadpool(
     return await asyncio.to_thread(_func)
 
 
-nginx_template = Template(open("./src/templates/nginx.conf", "r", encoding="utf-8").read())
+nginx_template = Template(
+    open("./src/templates/nginx.conf", "r", encoding="utf-8").read()
+)
 
 
 def nginx_cleanup():
-    
     directories = [
         "/etc/nginx/conf.d",
         "/etc/nginx/sites-enabled",
@@ -81,3 +82,34 @@ def is_async_callable(obj: typing.Any) -> bool:
     return asyncio.iscoroutinefunction(obj) or (
         callable(obj) and asyncio.iscoroutinefunction(obj.__call__)
     )
+
+
+class BackgroundTask:
+    def __init__(
+        self, func: typing.Callable[P, typing.Any], *args: P.args, **kwargs: P.kwargs
+    ) -> None:
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+        self.is_async = is_async_callable(func)
+
+    async def __call__(self) -> None:
+        if self.is_async:
+            await self.func(*self.args, **self.kwargs)
+        else:
+            await run_in_threadpool(self.func, *self.args, **self.kwargs)
+
+
+class BackgroundTasks(BackgroundTask):
+    def __init__(self, tasks: typing.Optional[typing.Sequence[BackgroundTask]] = None):
+        self.tasks = list(tasks) if tasks else []
+
+    def add_task(
+        self, func: typing.Callable[P, typing.Any], *args: P.args, **kwargs: P.kwargs
+    ) -> None:
+        task = BackgroundTask(func, *args, **kwargs)
+        self.tasks.append(task)
+
+    async def __call__(self) -> None:
+        for task in self.tasks:
+            await task()
