@@ -83,7 +83,7 @@ def use_auto(app: APIServer):
 
     @app.post("/api/content")
     async def create_blogpost(request:GenerateContentRequest):
-        """Creates a blogpost from a blog prompt and an image prompt"""
+        """Creates a blogpost with a cover image from a blog prompt and an image prompt"""
         blogpost_webpage = BlogPostWebPage(
             **request.dict()
         )
