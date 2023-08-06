@@ -17,17 +17,17 @@ BROWSER_HEADERS = {
 }
 
 SEO_DATA = {
-            "description": "",
-            "keywords": "",
-            "og:title": "",
-            "og:description": "",
-            "og:image": "",
-            "og:url": "",
-            "twitter:card": "",
-            "twitter:title": "",
-            "twitter:description": "",
-            "twitter:image": "",
-        }
+    "description": "",
+    "keywords": "",
+    "og:title": "",
+    "og:description": "",
+    "og:image": "",
+    "og:url": "",
+    "twitter:card": "",
+    "twitter:title": "",
+    "twitter:description": "",
+    "twitter:image": "",
+}
 
 
 async def search_google(
@@ -46,17 +46,21 @@ async def search_google(
                 for result in results
             ]
 
+
 async def get_seo_data(url: str, session: ClientSession):
     async with session.get(url) as response:
         seo_data = SEO_DATA.copy()
         soup = BeautifulSoup(await response.text(), "html.parser")
         for meta_tag in soup.find_all("meta"):
-            if (tag_name := meta_tag.get("name", meta_tag.get("property"))):
+            if tag_name := meta_tag.get("name", meta_tag.get("property")):
                 if tag_name.lower() in seo_data:
                     seo_data[tag_name.lower()] = meta_tag.get("content", "")
-            if not (seo_data["og:title"] or seo_data["twitter:title"]) and (title_tag := soup.find("title")):
+            if not (seo_data["og:title"] or seo_data["twitter:title"]) and (
+                title_tag := soup.find("title")
+            ):
                 seo_data["title"] = title_tag.text
         return seo_data
+
 
 class SEOTagSearch(FunctionType):
     """
@@ -71,11 +75,10 @@ class SEOTagSearch(FunctionType):
     async def run(self):
         self.results = await search_google(self.query, self.lang, self.limit)
         async with aiohttp.ClientSession(headers=BROWSER_HEADERS) as session:
-            tasks = [
-                get_seo_data(result.url, session) for result in self.results
-            ]
+            tasks = [get_seo_data(result.url, session) for result in self.results]
             self.results = await asyncio.gather(*tasks)
         return self.results
+
 
 class GoogleSearch(FunctionType):
     """
@@ -86,7 +89,7 @@ class GoogleSearch(FunctionType):
     lang: str = Field(default="en")
     limit: int = Field(default=10)
     results: Optional[List[SearchResult]] = Field(default=None)
-    
+
     async def run(self):
         self.results = await search_google(self.query, self.lang, self.limit)
         return self.results

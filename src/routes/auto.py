@@ -1,36 +1,35 @@
-import functools
-from typing import Any, Callable, List, Optional, Type, Union, cast
-
+from typing import Any,List
+from uuid import uuid4
 from aiofauna import APIServer
+from aiofauna.json import to_json
 from aiofauna.llm import function_call
 from aiofauna.llm.llm import Model
 from aiofauna.typedefs import FunctionType
 from aiohttp import ClientSession
-from aiohttp.client_reqrep import ContentDisposition
-from boto3 import Session
 from jinja2 import Template
 from markdown_it import MarkdownIt
 from markdown_it.renderer import RendererHTML
-from markdown_it.rules_block import StateBlock
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
-from pygments.lexers import MarkdownLexer, get_lexer_by_name
-
-from src.config import credentials
+from pygments.lexers import get_lexer_by_name
+from src.helpers.loaders import ingest_pdf, pdf_reader
 from src.schemas import *
 from src.tools import content
 from src.tools.content import \
     CreateImageRequest  # pylint: disable=no-name-in-module
-
+from ..helpers import task
 from ..services import *
+from ..services.pubsub import FunctionQueue
 
 context_template = Template(
     """
     You are Automation Bot, you take user prompt and choose the right function to call to automate what user inquiry consists of.
     The user inquiry is: {{ text }}
-    """)
+    """
+)
 
 logger = setup_logging(__name__)
+
 
 class HighlightRenderer(RendererHTML):
     def code_block(self, tokens, idx, options, env):
@@ -39,6 +38,7 @@ class HighlightRenderer(RendererHTML):
         formatter = HtmlFormatter()
         return highlight(token.content, lexer, formatter)
 
+
 def highlight_code(code, name, attrs):
     """Highlight a block of code"""
     lexer = get_lexer_by_name(name)
@@ -46,63 +46,76 @@ def highlight_code(code, name, attrs):
 
     return highlight(code, lexer, formatter)
 
+
 md = MarkdownIt(
-            "js-default",
-            options_update={
-                "html": True,
-                "typographer": True,
-                "highlight": highlight_code
-            },
-            renderer_cls=HighlightRenderer,
-        )
+    "js-default",
+    options_update={"html": True, "typographer": True, "highlight": highlight_code},
+    renderer_cls=HighlightRenderer,
+)
 
 s3 = session.client("s3", region_name="us-east-1")
+
 
 def render_markdown(text: str) -> str:
     """Render markdown to html"""
     return md.render(text)
 
+@task
+async def automate(text: str, namespace: str):
+    response = await function_call(
+        text=text, context=context_template.render(text=text)
+    )
+    resturnable = DeterministicFunction(response=response, type=type(response).__name__)
+    queue = FunctionQueue(namespace=namespace)
+    await queue.pub(message=to_json(resturnable))
 
 class DeterministicFunction(BaseModel):
-    response:Any = Field(..., description="The response returned by the openai function.")
-    type: str = Field(..., description="The type of the value returned by the openai function.")
+    response: Any = Field(
+        ..., description="The response returned by the openai function."
+    )
+    type: str = Field(
+        ..., description="The type of the value returned by the openai function."
+    )
+
 
 def use_auto(app: APIServer):
-    
-    @app.get("/api/functions/")
-    async def list_functions():
-        response = [i.openaischema for i in FunctionType._subclasses]
-        return response
-    
-    
+    @app.sse("/api/functions")
+    async def function_events(sse:EventSourceResponse,namespace:str):
+        queue = FunctionQueue(namespace=namespace)
+        async for event in queue.sub():
+            await sse.send(event)
+
     @app.post("/api/functions")
-    async def automate(text:str):
-        response = await function_call(text=text,context=context_template.render(text=text))
-        return DeterministicFunction(response=response,type=type(response).__name__)
+    async def function_endpoint(text:str,namespace:str):
+        await automate(text=text,namespace=namespace)
+        return {"status":"success","message":f"message sent to {namespace}"}
     
 
     @app.post("/api/content")
-    async def create_blogpost(request:GenerateContentRequest):
+    async def create_blogpost(request: GenerateContentRequest,namespace:str):
         """Creates a blogpost with a cover image from a blog prompt and an image prompt"""
-        blogpost_webpage = BlogPostWebPage(
-            **request.dict()
-        )
+        bucket_name = "images-aiofauna"
+        blogpost_webpage = BlogPostWebPage(**request.dict())
+        image_url = await CreateImageRequest(prompt=request.image_prompt).run()
         async with ClientSession() as session:
-            async with session.get(blogpost_webpage.image) as resp: # type: ignore
+            async with session.get(image_url) as resp:  # type: ignore
                 res = await resp.read()
+                id_ = str(uuid4())
                 s3.put_object(
-                    Bucket="aiofauna-images",
-                    Key=f"{blogpost_webpage.user}/{blogpost_webpage.title}.png", # type: ignore
+                    Bucket=bucket_name,
+                    Key=f"{blogpost_webpage.user}/{id_}.png",  # type: ignore
                     Body=res,
                     ACL="public-read",
-                    ContentType="image/png"
+                    ContentType="image/png",
                 )
-                blogpost_webpage.image = f"https://s3.amazonaws.com/aiofauna-images/{blogpost_webpage.user}/{blogpost_webpage.title}.png"
-                await blogpost_webpage.save()
-        return await blogpost_webpage.run()
-    
+                blogpost_webpage.image = f"https://s3.amazonaws.com/{bucket_name}/{blogpost_webpage.user}/{id_}.png"
+                response = await blogpost_webpage.run()
+                queue = FunctionQueue(namespace=namespace)
+                await queue.pub(message=to_json(response))
+                return {"status":"success","message":f"message sent to {namespace}"}
+
     @app.get("/api/content")
-    async def list_content(user:str)->List[BlogPostWebPage]:
+    async def list_content(user: str) -> List[BlogPostWebPage]:
         """List all the content generated by a user"""
         response = await BlogPostWebPage.find_many(user=user)
         logger.info(response)
@@ -110,14 +123,14 @@ def use_auto(app: APIServer):
             if i.content is not None:
                 i.content = render_markdown(i.content)
         return response
-    
+
     @app.delete("/api/content")
-    async def delete_content(id:str)->bool:
+    async def delete_content(id: str) -> bool:
         """Deletes all the content generated by a user"""
         return await BlogPostWebPage.delete(id)
 
     @app.post("/api/upload")
-    async def upload_image(request:Request):
+    async def upload_image(request: Request):
         """Uploads an asset to S3"""
         asset = await UploadRequest.from_request(request)
         s3.put_object(
@@ -125,17 +138,29 @@ def use_auto(app: APIServer):
             Key=asset.key,
             Body=asset.file.file.read(),
             ACL="public-read",
-            ContentType=asset.file.content_type
+            ContentType=asset.file.content_type,
         )
         url = f"https://s3.amazonaws.com/{asset.bucket_name}/{asset.key}"
         return await Upload(
-            user=asset.user,
-            name=asset.file.filename,
-            key=asset.key,
-            bucket=asset.bucket,
-            size=asset.size,
-            content_type=asset.file.content_type,
-            url=url
+            user=asset.user,  # type: ignore
+            name=asset.file.filename,  # type: ignore
+            key=asset.key,  # type: ignore
+            bucket=asset.bucket,  # type: ignore
+            size=asset.size,  # type: ignore
+            content_type=asset.file.content_type,  # type: ignore
+            url=url,  # type: ignore
         ).save()
-    
+
+    @app.post("/api/pdf")
+    async def upload_pdf(request: Request):
+        namespace = request.query.get("namespace")
+        assert namespace is not None
+        responses = []
+        async for chunk in pdf_reader(request):
+            responses.append(chunk)
+        returns = []
+        async for response in ingest_pdf(responses, namespace):
+            returns.append(response)
+        return returns
+
     return app

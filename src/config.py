@@ -67,7 +67,7 @@ class Env(BaseSettings):
     CF_ACCOUNT_ID: str = Data(..., env="CF_ACCOUNT_ID")
     IP_ADDR: str = Data(..., env="IP_ADDR")
     CLIENT_URL: str = Data(..., env="CLIENT_URL")
-
+    REDIS_URL: str = Data(..., env="REDIS_URL")
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 

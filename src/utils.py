@@ -1,5 +1,6 @@
 import asyncio
 import functools
+import math
 import os
 import shutil
 import socket
@@ -113,3 +114,8 @@ class BackgroundTasks(BackgroundTask):
     async def __call__(self) -> None:
         for task in self.tasks:
             await task()
+
+
+
+def sanitize_vector(vector):
+    return [float(x) if math.isfinite(x) else 0.0 for x in vector]

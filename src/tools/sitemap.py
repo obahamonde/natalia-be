@@ -76,7 +76,7 @@ async def upsert_embeddings(texts: List[str], namespace: str, session: ClientSes
     vectors = UpsertRequest(
         namespace=namespace,
         vectors=[
-            UpsertVector(values=vector, metadata={"text": text})
+            UpsertVector(id=str(uuid4()), values=vector, metadata={"text": text})
             for text, vector in zip(texts, embeddings)
         ],
     )

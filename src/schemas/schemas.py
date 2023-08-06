@@ -16,4 +16,8 @@ class GenerateContentRequest(BaseModel):
     blog_prompt: str
     image_prompt: str
     user: str
+    namespace: str
+
+class FunctionRequest(BaseModel):
+    text:str
     namespace:str

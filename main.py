@@ -1,16 +1,11 @@
 from dotenv import load_dotenv
 
 load_dotenv()
-import asyncio
 import os
 import subprocess
-from functools import partial
 from pathlib import Path
 
 import click
-from aiofauna.faunadb import query as q
-from aiohttp.web import run_app
-from requests import post
 
 from src import create_app
 from src.utils import gen_port, nginx_cleanup

@@ -65,13 +65,15 @@ class Namespace(FaunaModel):
             text=text, context=context, namespace=self.ref
         )
         user_message = await ChatMessage(
-            role="user", content=text, conversation=self.ref # type:ignore
+            role="user", content=text, conversation=self.ref  # type:ignore
         ).save()
         assistant_message = await ChatMessage(
-            role="assistant", content=response, conversation=self.ref # type:ignore
+            role="assistant", content=response, conversation=self.ref  # type:ignore
         ).save()
         await self.update(
-            self.ref, messages=self.messages + [user_message.ref, assistant_message.ref] # type:ignore
+            self.ref,
+            messages=self.messages
+            + [user_message.ref, assistant_message.ref],  # type:ignore
         )  # type:ignore
         return await ChatMessage.find_many(conversation=self.ref)
 
@@ -162,23 +164,20 @@ class BlogPostWebPage(FaunaModel, FunctionType):
     )
     user: str = Field(..., description="User sub", index=True)
     namespace: str = Field(..., description="File namespace", index=True)
-    
-    
+
     async def run(self):
         return await self.create_content()
-      
 
     async def create_content(self):
-        image = await CreateImageRequest(prompt=self.image_prompt).run()
-        self.image = image
         prompt_template = f"""
         System:
         You are an SEO expert and master copywriter, while being proficient writing content in Markdown, you goal is to write a comprehensive, creative and engaging blogpost about the following topic:
         {self.blog_prompt}
         You must include the following image as the cover of the blogpost:
-        {image}
+        {self.image}
         
         AI:
         """
         self.content = await llm.chat(text=self.blog_prompt, context=prompt_template)
+        await self.save()
         return markdown(self.content)

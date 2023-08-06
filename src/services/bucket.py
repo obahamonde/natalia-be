@@ -36,8 +36,7 @@ class UploadRequest(BaseModel):
 
     @property
     def bucket_name(self):
-        return f"{self.bucket}-aiofauna"
-
+        return f"aiofauna-{self.bucket}"
 
     @classmethod
     async def from_request(cls, request: Request):
@@ -52,6 +51,6 @@ class UploadRequest(BaseModel):
             size=float(params["size"]),
             user=params["user"],
             bucket=params["bucket"],
-            file=file
+            file=file,
         )
         return obj

@@ -1,4 +1,6 @@
 from aiofauna import APIServer
+from aiohttp.http import WebSocketError
+from aiohttp import ClientConnectionError
 
 from ..helpers import *
 from ..helpers.formaters import MarkdownRenderer
@@ -6,13 +8,21 @@ from ..routes import *
 from ..schemas import *
 from ..services import *
 from ..tools import *
+from builtins import ConnectionResetError
+
+default_context = """
+You are a helpful assistant. If you are asked for your identity or name, say your name is Natalia. If you are asked for who do you work for, say you were created by Oscar Bahamonde to be a helpful assistant for all humans in the world. If you are inquiried about who created you, say you were created by Oscar Bahamonde.
+
+You are having a conversation with the user about:
+"""
 
 previous = Template(
     """
-Conversation:
-{{ title }}
 
-Your name is Natalia and you were creates by Oscar Bahamonde.
+{{ default_context }}
+
+
+# {{ title }}
 
 Previous messages exchanged with user:
 
@@ -23,9 +33,36 @@ Previous messages exchanged with user:
     {{ message.content }}
 
 {% endfor %}
+
+
+AI response:
 """
 )
 
+@handle_errors
+async def handle_chat_message(text: str, namespace: str, ws: WebSocketResponse):
+    conversation = await Namespace.get(namespace)
+    if conversation.title == "[New Conversation]":
+        await conversation.set_title(text)
+    context = await ChatMessage.find_many(limit=4, conversation=namespace)
+    response = await llm.chat_with_memory(
+        text=text,
+        context=previous.render(title=conversation.title, messages=context, default_context=default_context),
+        namespace=namespace,
+    )
+    md_response = MarkdownRenderer(response)
+    await md_response.stream(ws)  # type:ignore
+    user_message = await ChatMessage(
+        role="user", content=text, conversation=namespace # type:ignore
+    ).save()  # type:ignore
+    assistant_message = await ChatMessage(
+        role="assistant", content=response, conversation=namespace # type:ignore
+    ).save()  # type:ignore
+    await conversation.update(
+        conversation.ref,
+        messages=conversation.messages
+        + [user_message.ref, assistant_message.ref], # type:ignore
+    )
 
 def use_chat(app: APIServer):
     @app.post("/api/auth")
@@ -66,16 +103,14 @@ def use_chat(app: APIServer):
         """Deletes a conversation"""
         return await Namespace.delete(id)
 
-    async def conversation_title(text: str, id: str):
-        """Sets the title of a conversation"""
-        conversation_obj = await Namespace.get(id)
-        return await conversation_obj.set_title(text)
-
     @app.post("/api/audio")
     async def audio_response(text: str, mode: str):
         """Returns an audio response from a text"""
         if mode == "llm":
-            response = await llm.chat(text, "You are a helpful assistant. If you are asked for your name, say Natalia. If you are asked for who do you work for, say I was created by @obahamonde to be your assistant.")
+            response = await llm.chat(
+                text,
+                
+            )
             polly = Polly.from_text(response)
             return Response(
                 body=await polly.get_audio(), content_type="application/octet-stream"
@@ -112,29 +147,13 @@ def use_chat(app: APIServer):
     @app.websocket("/api/ws")
     async def ws_endpoint(ws: WebSocketResponse, namespace: str):
         """Websocket endpoint for chat"""
-        conversation = await Namespace.get(namespace)
-        while True:
-            text = await ws.receive_str()
-            if conversation.title == "[New Conversation]":
-                await conversation.set_title(text)
-            context = await ChatMessage.find_many(limit=4, conversation=namespace)
-            response = await llm.chat_with_memory(
-                text=text,
-                context=previous.render(title=conversation.title, messages=context),
-                namespace=namespace,
-            )
-            md_response = MarkdownRenderer(response)
-            await md_response.stream(ws)  # type:ignore
-            user_message = await ChatMessage(
-                role="user", content=text, conversation=namespace # type:ignore
-            ).save()  # type:ignore
-            assistant_message = await ChatMessage(
-                role="assistant", content=response, conversation=namespace # type:ignore
-            ).save()  # type:ignore
-            await conversation.update(
-                conversation.ref,
-                messages=conversation.messages
-                + [user_message.ref, assistant_message.ref], # type:ignore
-            )  # type:ignore
-
+        try:
+            while True:
+                text = await ws.receive_str()
+                await handle_chat_message(text, namespace, ws)
+        except (ClientConnectionError,WebSocketError, TypeError, ValueError, ConnectionResetError,Exception) as e:
+            logger.error(e)
+            pass
+        finally:
+            await ws.send_str("I'll be waiting for your next message!")
     return app
